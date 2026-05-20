@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shared Notes</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           var(--hub-bg, #f9fafb);
+      --card:         var(--hub-surface, #ffffff);
+      --border:       var(--hub-border, #e5e7eb);
+      --border-mid:   var(--hub-border, #d1d5db);
+      --text:         var(--hub-text, #111827);
+      --muted:        var(--hub-text-muted, #6b7280);
+      --accent:       var(--hub-primary, #111827);
+      --accent-fg:    var(--hub-primary-fg, #ffffff);
+      --accent-hover: var(--hub-primary-hover, #374151);
+      --radius:       var(--hub-radius, 0.5rem);
+      --red: #dc2626; --red-light: #fee2e2;
+    }
+
+    body {
+      font-family: var(--hub-font, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; font-size: 15px; line-height: 1.5;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 12px; margin-bottom: 24px; flex-wrap: wrap;
+    }
+    .header h1 { font-size: 1.4rem; font-weight: 700; }
+    .header p  { font-size: 0.875rem; color: var(--muted); margin-top: 2px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px; border-radius: 8px; font-size: 0.875rem;
+      font-weight: 600; cursor: pointer; border: none; transition: background .15s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: var(--accent-fg); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--border-mid); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-sm { padding: 4px 10px; font-size: 0.8rem; }
+    .btn-danger { background: transparent; color: var(--red); border: 1.5px solid #fca5a5; }
+    .btn-danger:hover { background: var(--red-light); }
+    .btn:disabled { opacity: .45; cursor: default; }
+
+    /* ── Form card ── */
+    .form-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 20px;
+    }
+    .form-card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 14px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+    .form-group input, .form-group textarea {
+      width: 100%; border: 1.5px solid var(--border-mid); border-radius: 8px;
+      padding: 8px 12px; font-size: 0.9rem; outline: none; font-family: inherit;
+      background: var(--bg); color: var(--text); transition: border-color .15s;
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+    .form-group textarea { resize: vertical; min-height: 100px; }
+    .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+    /* ── Notes grid ── */
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .note-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .note-card-header {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+    }
+    .note-title { font-weight: 600; font-size: 0.95rem; }
+    .note-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .note-content { font-size: 0.875rem; color: var(--muted); white-space: pre-wrap; flex: 1; }
+    .note-meta { font-size: 0.72rem; color: var(--muted); }
+
+    /* ── Empty ── */
+    .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+    /* ── Error ── */
+    .error-banner {
+      background: var(--red-light); color: var(--red); border-radius: 8px;
+      padding: 10px 14px; font-size: 0.85rem; margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Shared Notes</h1>
+    <p>Notes visible to the whole family and AI agents</p>
+  </div>
+  <button class="btn btn-primary" id="new-btn">+ New Note</button>
+</div>
+
+<div id="error-area"></div>
+<div id="form-area"></div>
+<div class="notes-grid" id="notes-grid">
+  <div class="empty"><div class="empty-icon">📋</div><p>Loading…</p></div>
+</div>
+
+<script type="module">
+import { esc, formatRelativeDate } from "/hub-sdk.js";
+
+const HUB_MEMBER = window.__CURRENT_MEMBER ?? null;
+const authorName = HUB_MEMBER?.name ?? "Unknown";
+
+let notes = [];
+let editingId = null;
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+async function load() {
+  try {
+    notes = await api("/api/notes");
+    render();
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+// ── Render notes grid ─────────────────────────────────────────────────────────
+function render() {
+  const grid = document.getElementById("notes-grid");
+  if (notes.length === 0) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
+      <div class="empty-icon">📋</div>
+      <p>No notes yet. Create one to share with your family.</p>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = notes.map(n => `
+    <div class="note-card">
+      <div class="note-card-header">
+        <span class="note-title">${esc(n.title)}</span>
+        <div class="note-actions">
+          <button class="btn btn-ghost btn-sm" onclick="startEdit('${n.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="removeNote('${n.id}')">Delete</button>
+        </div>
+      </div>
+      ${n.content
+        ? `<p class="note-content">${esc(n.content)}</p>`
+        : `<p class="note-content" style="font-style:italic;opacity:.5">Empty</p>`}
+      <p class="note-meta">By ${esc(n.createdBy)} · ${formatRelativeDate(n.updatedAt)}</p>
+    </div>`).join("");
+}
+
+// ── Form ──────────────────────────────────────────────────────────────────────
+function showForm(existing = null) {
+  editingId = existing?.id ?? null;
+  const area = document.getElementById("form-area");
+  area.innerHTML = `
+    <div class="form-card">
+      <h2>${existing ? "Edit Note" : "New Note"}</h2>
+      <div class="form-group">
+        <label>Title</label>
+        <input id="f-title" type="text" value="${esc(existing?.title ?? "")}" placeholder="e.g. Wifi Password" autofocus />
+      </div>
+      <div class="form-group">
+        <label>Content</label>
+        <textarea id="f-content" placeholder="Write anything…">${esc(existing?.content ?? "")}</textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="cancelForm()">Cancel</button>
+        <button class="btn btn-primary" id="f-submit">${existing ? "Save" : "Create"}</button>
+      </div>
+    </div>`;
+
+  document.getElementById("f-submit").addEventListener("click", submitForm);
+  document.getElementById("f-title").addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); submitForm(); }
+  });
+  document.getElementById("f-title").focus();
+}
+
+function cancelForm() {
+  editingId = null;
+  document.getElementById("form-area").innerHTML = "";
+}
+
+async function submitForm() {
+  const title   = document.getElementById("f-title").value.trim();
+  const content = document.getElementById("f-content").value;
+  if (!title) { document.getElementById("f-title").focus(); return; }
+
+  const btn = document.getElementById("f-submit");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+
+  try {
+    if (editingId) {
+      await api(`/api/notes/${editingId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title, content }),
+      });
+    } else {
+      await api("/api/notes", {
+        method: "POST",
+        body: JSON.stringify({ title, content, createdBy: authorName }),
+      });
+    }
+    cancelForm();
+    await load();
+  } catch (e) {
+    showError(e.message);
+    btn.disabled = false;
+    btn.textContent = editingId ? "Save" : "Create";
+  }
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+window.startEdit = (id) => {
+  const note = notes.find(n => n.id === id);
+  if (note) showForm(note);
+};
+
+window.removeNote = async (id) => {
+  const note = notes.find(n => n.id === id);
+  if (!note || !confirm(`Delete "${note.title}"?`)) return;
+  try {
+    await api(`/api/notes/${id}`, { method: "DELETE" });
+    await load();
+  } catch (e) {
+    showError(e.message);
+  }
+};
+
+// ── Error display ─────────────────────────────────────────────────────────────
+function showError(msg) {
+  const area = document.getElementById("error-area");
+  area.innerHTML = `<div class="error-banner">Error: ${esc(msg)}</div>`;
+  setTimeout(() => { area.innerHTML = ""; }, 5000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.getElementById("new-btn").addEventListener("click", () => showForm());
+load();
+</script>
+</body>
+</html>

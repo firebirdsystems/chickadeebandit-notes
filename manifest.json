@@ -1,0 +1,23 @@
+{
+  "id": "notes",
+  "name": "Shared Notes",
+  "version": "1.0.0",
+  "description": "Shared family notes — wifi passwords, house rules, recipes, anything the whole family needs.",
+  "entrypoint": "index.html",
+  "runtime": "static",
+  "category": "family",
+  "tags": ["notes", "shared", "family"],
+  "data_access": {
+    "reads": ["family.members"],
+    "writes": []
+  },
+  "permissions": {
+    "default_audience": "everyone",
+    "requires_approval": false
+  },
+  "storage": "none",
+  "nav": {
+    "label": "Notes",
+    "icon": "📝"
+  }
+}
