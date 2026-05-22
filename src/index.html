@@ -115,7 +115,7 @@
 </div>
 
 <script type="module">
-import { esc, formatRelativeDate } from "/hub-sdk.js";
+import { esc, formatRelativeDate, hubConfirm } from "/hub-sdk.js";
 
 const HUB_MEMBER = window.__CURRENT_MEMBER ?? null;
 const authorName = HUB_MEMBER?.name ?? "Unknown";
@@ -244,7 +244,7 @@ window.startEdit = (id) => {
 
 window.removeNote = async (id) => {
   const note = notes.find(n => n.id === id);
-  if (!note || !confirm(`Delete "${note.title}"?`)) return;
+  if (!note || !await hubConfirm({ message: `Delete "${note.title}"?`, confirmLabel: "Delete", destructive: true })) return;
   try {
     await api(`/api/notes/${id}`, { method: "DELETE" });
     await load();
