@@ -2,10 +2,10 @@
   "id": "notes",
   "name": "Shared Notes",
   "version": "1.0.0",
-  "description": "Shared family notes — wifi passwords, house rules, recipes, anything the whole family needs.",
+  "description": "Shared notes — wifi passwords, house rules, recipes, anything the whole family needs.",
   "entrypoint": "index.html",
   "runtime": "static",
-  "category": "family",
+  "category": "general",
   "tags": [
     "notes",
     "shared",
