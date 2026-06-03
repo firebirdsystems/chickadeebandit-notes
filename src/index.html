@@ -121,6 +121,7 @@ const HUB_MEMBER = window.__CURRENT_MEMBER ?? null;
 const authorName = HUB_MEMBER?.name ?? "Unknown";
 
 let notes = [];
+let notesMap = new Map();
 let editingId = null;
 
 // ── API helpers ───────────────────────────────────────────────────────────────
@@ -140,6 +141,7 @@ async function api(path, opts = {}) {
 async function load() {
   try {
     notes = await api("/api/notes");
+    notesMap = new Map(notes.map(n => [n.id, n]));
     render();
   } catch (e) {
     showError(e.message);
@@ -158,13 +160,13 @@ function render() {
   }
 
   grid.innerHTML = notes.map(n => `
-    <div class="note-card">
+    <div class="note-card"${n._pending ? ' style="opacity:.6"' : ""}>
       <div class="note-card-header">
         <span class="note-title">${esc(n.title)}</span>
-        <div class="note-actions">
+        ${n._pending ? "" : `<div class="note-actions">
           <button class="btn btn-ghost btn-sm" onclick="startEdit('${n.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="removeNote('${n.id}')">Delete</button>
-        </div>
+        </div>`}
       </div>
       ${n.content
         ? `<p class="note-content">${esc(n.content)}</p>`
@@ -211,13 +213,29 @@ async function submitForm() {
   const content = document.getElementById("f-content").value;
   if (!title) { document.getElementById("f-title").focus(); return; }
 
-  const btn = document.getElementById("f-submit");
-  btn.disabled = true;
-  btn.textContent = "Saving…";
+  const now = new Date().toISOString();
+  const isNew = !editingId;
+  const noteId = editingId ?? crypto.randomUUID();
 
+  // Optimistic update
+  if (isNew) {
+    const optimistic = { id: noteId, title, content, createdBy: authorName, updatedAt: now, _pending: true };
+    notes.unshift(optimistic);
+    notesMap.set(noteId, optimistic);
+  } else {
+    const existing = notesMap.get(noteId);
+    const updated = { ...existing, title, content, updatedAt: now };
+    notesMap.set(noteId, updated);
+    const idx = notes.findIndex(n => n.id === noteId);
+    if (idx !== -1) notes[idx] = updated;
+  }
+  cancelForm();
+  render();
+
+  // Persist in the background
   try {
-    if (editingId) {
-      await api(`/api/notes/${editingId}`, {
+    if (!isNew) {
+      await api(`/api/notes/${noteId}`, {
         method: "PATCH",
         body: JSON.stringify({ title, content }),
       });
@@ -227,29 +245,33 @@ async function submitForm() {
         body: JSON.stringify({ title, content, createdBy: authorName }),
       });
     }
-    cancelForm();
     await load();
   } catch (e) {
     showError(e.message);
-    btn.disabled = false;
-    btn.textContent = editingId ? "Save" : "Create";
+    await load();
   }
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 window.startEdit = (id) => {
-  const note = notes.find(n => n.id === id);
+  const note = notesMap.get(id);
   if (note) showForm(note);
 };
 
 window.removeNote = async (id) => {
-  const note = notes.find(n => n.id === id);
+  const note = notesMap.get(id);
   if (!note || !await hubConfirm({ message: `Delete "${note.title}"?`, confirmLabel: "Delete", destructive: true })) return;
+
+  // Optimistic removal
+  notesMap.delete(id);
+  notes = notes.filter(n => n.id !== id);
+  render();
+
   try {
     await api(`/api/notes/${id}`, { method: "DELETE" });
-    await load();
   } catch (e) {
     showError(e.message);
+    await load();
   }
 };
 
