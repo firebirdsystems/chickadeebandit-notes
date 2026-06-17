@@ -117,6 +117,7 @@
 <script type="module">
 import { esc, formatRelativeDate, hubConfirm } from "/hub-sdk.js";
 
+const DB = window.__DB_URL;
 const HUB_MEMBER = window.__CURRENT_MEMBER ?? null;
 const authorName = HUB_MEMBER?.name ?? "Unknown";
 
@@ -124,23 +125,34 @@ let notes = [];
 let notesMap = new Map();
 let editingId = null;
 
-// ── API helpers ───────────────────────────────────────────────────────────────
-async function api(path, opts = {}) {
-  const res = await fetch(path, {
+// ── D1 helper ─────────────────────────────────────────────────────────────────
+async function db(sql, params = []) {
+  const res = await fetch(DB, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    ...opts,
+    body: JSON.stringify({ sql, params }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? `HTTP ${res.status}`);
+    throw new Error(err.error ?? `DB error ${res.status}`);
   }
-  return res.status === 204 ? null : res.json();
+  return res.json();
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function load() {
   try {
-    notes = await api("/api/notes");
+    const rows = await db(
+      "SELECT id, title, content, created_by, created_at, updated_at FROM app_notes__notes ORDER BY updated_at DESC"
+    );
+    notes = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      content: r.content,
+      createdBy: r.created_by,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
     notesMap = new Map(notes.map(n => [n.id, n]));
     render();
   } catch (e) {
@@ -232,18 +244,17 @@ async function submitForm() {
   cancelForm();
   render();
 
-  // Persist in the background
   try {
-    if (!isNew) {
-      await api(`/api/notes/${noteId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ title, content }),
-      });
+    if (isNew) {
+      await db(
+        "INSERT INTO app_notes__notes (id, title, content, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        [noteId, title, content, authorName, now, now]
+      );
     } else {
-      await api("/api/notes", {
-        method: "POST",
-        body: JSON.stringify({ title, content, createdBy: authorName }),
-      });
+      await db(
+        "UPDATE app_notes__notes SET title = ?, content = ?, updated_at = ? WHERE id = ?",
+        [title, content, now, noteId]
+      );
     }
     await load();
   } catch (e) {
@@ -262,13 +273,12 @@ window.removeNote = async (id) => {
   const note = notesMap.get(id);
   if (!note || !await hubConfirm({ message: `Delete "${note.title}"?`, confirmLabel: "Delete", destructive: true })) return;
 
-  // Optimistic removal
   notesMap.delete(id);
   notes = notes.filter(n => n.id !== id);
   render();
 
   try {
-    await api(`/api/notes/${id}`, { method: "DELETE" });
+    await db("DELETE FROM app_notes__notes WHERE id = ?", [id]);
   } catch (e) {
     showError(e.message);
     await load();
