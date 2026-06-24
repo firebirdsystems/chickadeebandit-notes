@@ -118,11 +118,13 @@
 import { esc, formatRelativeDate, hubConfirm } from "/hub-sdk.js";
 
 const DB = window.__DB_URL;
+const CONTEXT = window.__CONTEXT_URL ?? "";
 const HUB_MEMBER = window.__CURRENT_MEMBER ?? null;
-const authorName = HUB_MEMBER?.name ?? "Unknown";
 
 let notes = [];
 let notesMap = new Map();
+let members = [];
+let membersMap = new Map();
 let editingId = null;
 
 // ── D1 helper ─────────────────────────────────────────────────────────────────
@@ -140,12 +142,25 @@ async function db(sql, params = []) {
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
+async function loadMembers() {
+  if (!CONTEXT) return;
+  try {
+    const res = await fetch(`${CONTEXT}?keys=family.members`);
+    members = ((await res.json())["family.members"]) ?? [];
+    membersMap = new Map(members.map(m => [m.id, m]));
+  } catch { members = []; }
+}
+
+function memberName(id) {
+  return membersMap.get(id)?.name ?? id;
+}
+
 async function load() {
   try {
-    const rows = await db(
+    const result = await db(
       "SELECT id, title, content, created_by, created_at, updated_at FROM app_notes__notes ORDER BY updated_at DESC"
     );
-    notes = rows.map(r => ({
+    notes = (result.rows ?? []).map(r => ({
       id: r.id,
       title: r.title,
       content: r.content,
@@ -183,7 +198,7 @@ function render() {
       ${n.content
         ? `<p class="note-content">${esc(n.content)}</p>`
         : `<p class="note-content" style="font-style:italic;opacity:.5">Empty</p>`}
-      <p class="note-meta">By ${esc(n.createdBy)} · ${formatRelativeDate(n.updatedAt)}</p>
+      <p class="note-meta">By ${esc(memberName(n.createdBy))} · ${formatRelativeDate(n.updatedAt)}</p>
     </div>`).join("");
 }
 
@@ -231,7 +246,7 @@ async function submitForm() {
 
   // Optimistic update
   if (isNew) {
-    const optimistic = { id: noteId, title, content, createdBy: authorName, updatedAt: now, _pending: true };
+    const optimistic = { id: noteId, title, content, createdBy: HUB_MEMBER?.id ?? "unknown", updatedAt: now, _pending: true };
     notes.unshift(optimistic);
     notesMap.set(noteId, optimistic);
   } else {
@@ -248,7 +263,7 @@ async function submitForm() {
     if (isNew) {
       await db(
         "INSERT INTO app_notes__notes (id, title, content, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        [noteId, title, content, authorName, now, now]
+        [noteId, title, content, HUB_MEMBER?.id ?? "unknown", now, now]
       );
     } else {
       await db(
@@ -294,7 +309,7 @@ function showError(msg) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.getElementById("new-btn").addEventListener("click", () => showForm());
-load();
+(async () => { await loadMembers(); await load(); })();
 </script>
 </body>
 </html>
