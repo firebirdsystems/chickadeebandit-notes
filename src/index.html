@@ -211,7 +211,7 @@ function showForm(existing = null) {
       <h2>${existing ? "Edit Note" : "New Note"}</h2>
       <div class="form-group">
         <label>Title</label>
-        <input id="f-title" type="text" value="${esc(existing?.title ?? "")}" placeholder="e.g. Wifi Password" autofocus />
+        <input id="f-title" type="text" value="${esc(existing?.title ?? "")}" placeholder="e.g. Wifi Password" data-autofocus />
       </div>
       <div class="form-group">
         <label>Content</label>
