@@ -191,8 +191,8 @@ function render() {
       <div class="note-card-header">
         <span class="note-title">${esc(n.title)}</span>
         ${n._pending ? "" : `<div class="note-actions">
-          <button class="btn btn-ghost btn-sm" onclick="startEdit('${n.id}')">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="removeNote('${n.id}')">Delete</button>
+          <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${esc(n.id)}">Edit</button>
+          <button class="btn btn-danger btn-sm" data-action="delete" data-id="${esc(n.id)}">Delete</button>
         </div>`}
       </div>
       ${n.content
@@ -309,6 +309,18 @@ function showError(msg) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.getElementById("new-btn").addEventListener("click", () => showForm());
+
+// Delegated handler: note ids are user-controllable (any member can INSERT a note
+// with an attacker-chosen id via raw /api/db), so they must never be interpolated
+// into an inline handler. Read them back from data-id instead.
+document.getElementById("notes-grid").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const id = btn.getAttribute("data-id");
+  if (btn.dataset.action === "edit") startEdit(id);
+  else if (btn.dataset.action === "delete") removeNote(id);
+});
+
 (async () => { await loadMembers(); await load(); })();
 </script>
 </body>
