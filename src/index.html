@@ -116,6 +116,7 @@
 
 <script type="module">
 import { esc, formatRelativeDate, hubConfirm } from "/hub-sdk.js";
+import { memberName as memberNameOf, mapNoteRows } from "./logic.js";
 
 const DB = window.__DB_URL;
 const CONTEXT = window.__CONTEXT_URL ?? "";
@@ -151,23 +152,14 @@ async function loadMembers() {
   } catch { members = []; }
 }
 
-function memberName(id) {
-  return membersMap.get(id)?.name ?? id;
-}
+function memberName(id) { return memberNameOf(membersMap, id); }
 
 async function load() {
   try {
     const result = await db(
       "SELECT id, title, content, created_by, created_at, updated_at FROM app_notes__notes ORDER BY updated_at DESC"
     );
-    notes = (result.rows ?? []).map(r => ({
-      id: r.id,
-      title: r.title,
-      content: r.content,
-      createdBy: r.created_by,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-    }));
+    notes = mapNoteRows(result.rows);
     notesMap = new Map(notes.map(n => [n.id, n]));
     render();
   } catch (e) {
