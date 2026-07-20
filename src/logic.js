@@ -20,3 +20,10 @@ export function mapNoteRow(r) {
 export function mapNoteRows(rows) {
   return (rows ?? []).map(mapNoteRow);
 }
+
+// Fields the in-app search matches against (see hub-sdk searchMatch). Title and
+// content both count, so a note is findable by anything written in its body,
+// not just its title.
+export function searchableFields(note) {
+  return [note.title, note.content];
+}

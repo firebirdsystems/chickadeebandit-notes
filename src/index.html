@@ -67,6 +67,15 @@
     .form-group textarea { resize: vertical; min-height: 100px; }
     .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
+    /* ── Search row ── */
+    .search-row { margin-bottom: 16px; }
+    .search-input {
+      width: 100%; border: 1.5px solid var(--border-mid); border-radius: 8px;
+      padding: 8px 12px; font-size: 0.9rem; outline: none; font-family: inherit;
+      background: var(--card); color: var(--text); transition: border-color .15s;
+    }
+    .search-input:focus { border-color: var(--accent); }
+
     /* ── Notes grid ── */
     .notes-grid {
       display: grid;
@@ -110,13 +119,16 @@
 
 <div id="error-area"></div>
 <div id="form-area"></div>
+<div class="search-row">
+  <input id="search-input" class="search-input" type="search" placeholder="Search notes…" aria-label="Search notes" />
+</div>
 <div class="notes-grid" id="notes-grid">
   <div class="empty"><div class="empty-icon">📋</div><p>Loading…</p></div>
 </div>
 
 <script type="module">
-import { esc, formatRelativeDate, hubConfirm } from "/hub-sdk.js";
-import { memberName as memberNameOf, mapNoteRows } from "./logic.js";
+import { esc, formatRelativeDate, hubConfirm, searchMatch } from "/hub-sdk.js";
+import { memberName as memberNameOf, mapNoteRows, searchableFields } from "./logic.js";
 
 const DB = window.__DB_URL;
 const CONTEXT = window.__CONTEXT_URL ?? "";
@@ -127,6 +139,7 @@ let notesMap = new Map();
 let members = [];
 let membersMap = new Map();
 let editingId = null;
+let searchQ = "";
 
 // ── D1 helper ─────────────────────────────────────────────────────────────────
 async function db(sql, params = []) {
@@ -178,7 +191,17 @@ function render() {
     return;
   }
 
-  grid.innerHTML = notes.map(n => `
+  // Filter with the shared matcher over the fields logic.js declares searchable.
+  const list = searchQ ? notes.filter(n => searchMatch(searchQ, searchableFields(n))) : notes;
+  if (list.length === 0) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
+      <div class="empty-icon">🔍</div>
+      <p>No notes match "${esc(searchQ)}".</p>
+    </div>`;
+    return;
+  }
+
+  grid.innerHTML = list.map(n => `
     <div class="note-card"${n._pending ? ' style="opacity:.6"' : ""}>
       <div class="note-card-header">
         <span class="note-title">${esc(n.title)}</span>
@@ -301,6 +324,11 @@ function showError(msg) {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.getElementById("new-btn").addEventListener("click", () => showForm());
+
+document.getElementById("search-input").addEventListener("input", (e) => {
+  searchQ = e.target.value;
+  render();
+});
 
 // Delegated handler: note ids are user-controllable (any member can INSERT a note
 // with an attacker-chosen id via raw /api/db), so they must never be interpolated

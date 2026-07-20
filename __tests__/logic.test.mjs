@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { memberName, mapNoteRow, mapNoteRows } from "../src/logic.js";
+import { memberName, mapNoteRow, mapNoteRows, searchableFields } from "../src/logic.js";
 
 describe("memberName", () => {
   const map = new Map([["m1", { name: "Alex" }]]);
@@ -24,5 +24,12 @@ describe("mapNoteRows", () => {
   it("tolerates null/undefined", () => {
     expect(mapNoteRows(null)).toEqual([]);
     expect(mapNoteRows(undefined)).toEqual([]);
+  });
+});
+
+describe("searchableFields", () => {
+  it("includes both title and content so body text is findable", () => {
+    const note = { title: "Wifi", content: "password is hunter2" };
+    expect(searchableFields(note)).toEqual(["Wifi", "password is hunter2"]);
   });
 });
