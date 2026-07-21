@@ -114,7 +114,7 @@
     <h1>Shared Notes</h1>
     <p>Notes visible to the whole family and AI agents</p>
   </div>
-  <button class="btn btn-primary" id="new-btn">+ New Note</button>
+  <button class="btn btn-primary" id="new-btn" style="display:none">+ New Note</button>
 </div>
 
 <div id="error-area"></div>
@@ -127,12 +127,21 @@
 </div>
 
 <script type="module">
-import { esc, formatRelativeDate, hubConfirm, searchMatch } from "/hub-sdk.js";
+import { esc, formatRelativeDate, hubConfirm, searchMatch, isAdult } from "/hub-sdk.js";
 import { memberName as memberNameOf, mapNoteRows, searchableFields } from "./logic.js";
 
 const DB = window.__DB_URL;
 const CONTEXT = window.__CONTEXT_URL ?? "";
 const HUB_MEMBER = window.__CURRENT_MEMBER ?? null;
+const IS_ADULT  = isAdult(HUB_MEMBER);
+const IS_ADMIN  = window.__IS_ADMIN === true;
+const IS_ROSTER = window.__SPACE_KIND === "roster";
+// Who may create, edit, or delete notes. In a roster (classroom / team /
+// clients) only the steward — the space admin — writes; everyone else is
+// read-only. Elsewhere any adult writes. The hub enforces this server-side
+// (adult_writable + steward_writes_only on the notes table); this flag only
+// hides controls that would otherwise fail with a policy error.
+const CAN_WRITE = IS_ROSTER ? IS_ADMIN : IS_ADULT;
 
 let notes = [];
 let notesMap = new Map();
@@ -205,7 +214,7 @@ function render() {
     <div class="note-card"${n._pending ? ' style="opacity:.6"' : ""}>
       <div class="note-card-header">
         <span class="note-title">${esc(n.title)}</span>
-        ${n._pending ? "" : `<div class="note-actions">
+        ${n._pending || !CAN_WRITE ? "" : `<div class="note-actions">
           <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${esc(n.id)}">Edit</button>
           <button class="btn btn-danger btn-sm" data-action="delete" data-id="${esc(n.id)}">Delete</button>
         </div>`}
@@ -323,7 +332,11 @@ function showError(msg) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-document.getElementById("new-btn").addEventListener("click", () => showForm());
+const newBtn = document.getElementById("new-btn");
+// Read-only members (everyone but the steward in a roster, non-adults in a
+// household) never see the "new note" control — writes would be rejected.
+if (CAN_WRITE) newBtn.style.display = "";
+newBtn.addEventListener("click", () => showForm());
 
 document.getElementById("search-input").addEventListener("input", (e) => {
   searchQ = e.target.value;

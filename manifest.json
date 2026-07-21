@@ -11,6 +11,7 @@
     "shared",
     "family"
   ],
+  "contexts": ["household", "shared_space", "shared_space.roster"],
   "data_access": {
     "reads": [
       "family.members"
@@ -22,6 +23,12 @@
     "requires_approval": false
   },
   "storage": "db",
+  "row_policies": {
+    "notes": {
+      "kind": "adult_writable",
+      "steward_writes_only": true
+    }
+  },
   "nav": {
     "label": "Notes"
   },
