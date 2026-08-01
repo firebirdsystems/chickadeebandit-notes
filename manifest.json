@@ -23,6 +23,9 @@
     "requires_approval": false
   },
   "storage": "db",
+  "member_references": {
+    "notes": { "column": "created_by", "on_removed": "keep" }
+  },
   "row_policies": {
     "notes": {
       "kind": "adult_writable",
