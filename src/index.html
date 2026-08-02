@@ -133,6 +133,22 @@ import { memberName as memberNameOf, mapNoteRows, searchableFields } from "./log
 const DB = window.__DB_URL;
 const CONTEXT = window.__CONTEXT_URL ?? "";
 const HUB_MEMBER = window.__CURRENT_MEMBER ?? null;
+
+const EVENTS = window.__EVENTS_URL ?? "";
+
+async function publishEvent(type, subjectId, payload = {}) {
+  if (!EVENTS) return;
+  try {
+    await fetch(EVENTS, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, subject_id: subjectId, payload }),
+    });
+  } catch {
+    // Best-effort: the row is already written, so a failed publish is not fatal.
+  }
+}
+
 const IS_ADULT  = isAdult(HUB_MEMBER);
 const IS_ADMIN  = window.__IS_ADMIN === true;
 const IS_ROSTER = window.__SPACE_KIND === "roster";
@@ -289,6 +305,12 @@ async function submitForm() {
         "INSERT INTO app_notes__notes (id, title, content, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
         [noteId, title, content, HUB_MEMBER?.id ?? "unknown", now, now]
       );
+      // Title only — the body is the private part, and a note is shared content
+      // whose text does not belong in every rule's payload.
+      await publishEvent("note.created", noteId, {
+        title,
+        created_by: HUB_MEMBER?.id ?? "unknown",
+      });
     } else {
       await db(
         "UPDATE app_notes__notes SET title = ?, content = ?, updated_at = ? WHERE id = ?",
