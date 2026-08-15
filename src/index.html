@@ -114,15 +114,15 @@
     <h1>Shared Notes</h1>
     <p>Notes visible to the whole family and AI agents</p>
   </div>
-  <button class="btn btn-primary" id="new-btn" style="display:none">+ New Note</button>
+  <button class="btn btn-primary" id="new-btn" data-testid="new-note" style="display:none">+ New Note</button>
 </div>
 
-<div id="error-area"></div>
-<div id="form-area"></div>
+<div id="error-area" data-testid="error-area"></div>
+<div id="form-area" data-testid="form-area"></div>
 <div class="search-row">
-  <input id="search-input" class="search-input" type="search" placeholder="Search notes…" aria-label="Search notes" />
+  <input id="search-input" data-testid="search-input" class="search-input" type="search" placeholder="Search notes…" aria-label="Search notes" />
 </div>
-<div class="notes-grid" id="notes-grid">
+<div class="notes-grid" id="notes-grid" data-testid="notes-grid">
   <div class="empty"><div class="empty-icon">📋</div><p>Loading…</p></div>
 </div>
 
@@ -227,9 +227,9 @@ function render() {
   }
 
   grid.innerHTML = list.map(n => `
-    <div class="note-card"${n._pending ? ' style="opacity:.6"' : ""}>
+    <div class="note-card" data-testid="note-card" data-note-id="${esc(n.id)}"${n._pending ? ' style="opacity:.6"' : ""}>
       <div class="note-card-header">
-        <span class="note-title">${esc(n.title)}</span>
+        <span class="note-title" data-testid="note-title">${esc(n.title)}</span>
         ${n._pending || !CAN_WRITE ? "" : `<div class="note-actions">
           <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${esc(n.id)}">Edit</button>
           <button class="btn btn-danger btn-sm" data-action="delete" data-id="${esc(n.id)}">Delete</button>
@@ -247,19 +247,19 @@ function showForm(existing = null) {
   editingId = existing?.id ?? null;
   const area = document.getElementById("form-area");
   area.innerHTML = `
-    <div class="form-card">
+    <div class="form-card" data-testid="note-form">
       <h2>${existing ? "Edit Note" : "New Note"}</h2>
       <div class="form-group">
         <label>Title</label>
-        <input id="f-title" type="text" value="${esc(existing?.title ?? "")}" placeholder="e.g. Wifi Password" data-autofocus />
+        <input id="f-title" data-testid="field-title" type="text" value="${esc(existing?.title ?? "")}" placeholder="e.g. Wifi Password" data-autofocus />
       </div>
       <div class="form-group">
         <label>Content</label>
-        <textarea id="f-content" placeholder="Write anything…">${esc(existing?.content ?? "")}</textarea>
+        <textarea id="f-content" data-testid="field-content" placeholder="Write anything…">${esc(existing?.content ?? "")}</textarea>
       </div>
       <div class="form-actions">
-        <button class="btn btn-ghost" onclick="cancelForm()">Cancel</button>
-        <button class="btn btn-primary" id="f-submit">${existing ? "Save" : "Create"}</button>
+        <button class="btn btn-ghost" data-testid="note-cancel" onclick="cancelForm()">Cancel</button>
+        <button class="btn btn-primary" id="f-submit" data-testid="note-submit">${existing ? "Save" : "Create"}</button>
       </div>
     </div>`;
 
@@ -274,6 +274,7 @@ function cancelForm() {
   editingId = null;
   document.getElementById("form-area").innerHTML = "";
 }
+window.cancelForm = cancelForm;
 
 async function submitForm() {
   const title   = document.getElementById("f-title").value.trim();

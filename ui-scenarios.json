@@ -1,0 +1,31 @@
+{
+  "scenarios": [
+    {
+      "name": "a note created through the form survives a reload, and Cancel discards instead of saving",
+      "members": { "member": "adult" },
+      "steps": [
+        { "action": "open" },
+
+        { "action": "click", "selector": "[data-testid=\"new-note\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"note-form\"]" },
+        { "action": "fill", "selector": "[data-testid=\"field-title\"]", "value": "Wifi Password" },
+        { "action": "fill", "selector": "[data-testid=\"field-content\"]", "value": "hunter2" },
+        { "action": "click", "selector": "[data-testid=\"note-submit\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"note-form\"]", "state": "detached" },
+        { "action": "expectText", "text": "Wifi Password", "selector": "[data-testid=\"notes-grid\"]" },
+
+        { "action": "reload" },
+        { "action": "expectCount", "selector": "[data-testid=\"note-card\"]", "count": 1 },
+        { "action": "expectText", "text": "hunter2", "selector": "[data-testid=\"notes-grid\"]" },
+
+        { "action": "click", "selector": "[data-testid=\"new-note\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"note-form\"]" },
+        { "action": "fill", "selector": "[data-testid=\"field-title\"]", "value": "Discarded Draft" },
+        { "action": "click", "selector": "[data-testid=\"note-cancel\"]" },
+        { "action": "waitFor", "selector": "[data-testid=\"note-form\"]", "state": "detached" },
+        { "action": "expectCount", "selector": "[data-testid=\"note-card\"]", "count": 1 },
+        { "action": "expectNoText", "text": "Discarded Draft" }
+      ]
+    }
+  ]
+}
