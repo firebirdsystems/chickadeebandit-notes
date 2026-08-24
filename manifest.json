@@ -76,7 +76,6 @@
   },
   "publishes": ["note.created"],
   "publish_acls": {"note.created": {"require_role": "member"}},
-  "glance": {"source": {"kind": "sql", "query": "SELECT title AS title, updated_at AS at FROM app_notes__notes ORDER BY updated_at DESC LIMIT 3"}, "display": {"template": "list", "title": "title", "when": "at"}},
   "nav": {
     "label": "Notes"
   },
