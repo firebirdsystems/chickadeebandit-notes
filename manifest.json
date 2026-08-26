@@ -23,6 +23,9 @@
     "requires_approval": false
   },
   "storage": "db",
+  "preload": {
+    "notes": {"sql": "SELECT id, title, content, created_by, created_at, updated_at FROM app_notes__notes ORDER BY updated_at DESC"}
+  },
   "automation_actions": {
     "add_note": {
       "title": "Save a note",
