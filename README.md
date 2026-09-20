@@ -1,6 +1,6 @@
 # Shared Notes
 
-A [Chickadee Bandit](http://chickadeebandit.com) app.
+A [Chickadee Bandit](https://chickadeebandit.com/app-library/notes) app.
 
 Shared family notes — wifi passwords, house rules, recipes, anything the whole family needs.
 
