@@ -77,6 +77,16 @@
       "steward_writes_only": true
     }
   },
+  "shareable": {
+    "note": {
+      "table": "notes",
+      "title_column": "title",
+      "columns": [
+        { "column": "content", "label": "Note", "format": "multiline" },
+        { "column": "updated_at", "label": "Last updated", "format": "date" }
+      ]
+    }
+  },
   "publishes": ["note.created"],
   "publish_acls": {"note.created": {"require_role": "member"}},
   "nav": {
