@@ -123,13 +123,14 @@
   <input id="search-input" data-testid="search-input" class="search-input" type="search" placeholder="Search notes…" aria-label="Search notes" />
 </div>
 <div class="notes-grid" id="notes-grid" data-testid="notes-grid">
-  <div class="empty"><div class="empty-icon">📋</div><p>Loading…</p></div>
+  <div class="empty"><p>Loading…</p></div>
 </div>
 
 <script type="module">
 import {
   esc, formatRelativeDate, hubConfirm, searchMatch, isAdult,
   createShareHelper, activeShareLinks, SHARE_EXPIRY_CHOICES, DEFAULT_SHARE_EXPIRY_HOURS,
+  chickadee, glyph,
 } from "/hub-sdk.js";
 import { memberName as memberNameOf, mapNoteRows, searchableFields } from "./logic.js";
 import { createShareUi, createOverlayView } from "./share.js";
@@ -176,6 +177,7 @@ const shareUi = createShareUi({
   noun: "note",
   scopeHtml: () => "The page shows the note’s title, its text and when it was last updated. Anyone who gets the link can read it, so leave out anything you wouldn’t hand to the person you send it to.",
   esc,
+  glyph,
   confirm: (message, opts) => hubConfirm({ message, ...opts, destructive: true }),
   writeText: (text) => navigator.clipboard.writeText(text),
   activeLinks: activeShareLinks,
@@ -239,7 +241,7 @@ function render() {
   const grid = document.getElementById("notes-grid");
   if (notes.length === 0) {
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
-      <div class="empty-icon">📋</div>
+      <div class="empty-icon">${chickadee("nest", { size: 72 })}</div>
       <p>No notes yet. Create one to share with your family.</p>
     </div>`;
     return;
@@ -249,7 +251,7 @@ function render() {
   const list = searchQ ? notes.filter(n => searchMatch(searchQ, searchableFields(n))) : notes;
   if (list.length === 0) {
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
-      <div class="empty-icon">🔍</div>
+      <div class="empty-icon">${chickadee("searching", { size: 72 })}</div>
       <p>No notes match "${esc(searchQ)}".</p>
     </div>`;
     return;
