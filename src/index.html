@@ -254,7 +254,7 @@ async function load() {
     if (!loaded) {
       document.getElementById("notes-grid").innerHTML = "";
       setLoadFailed(true);
-    } else showError(e.message);
+    } else { console.error("[notes] reload failed:", e); showError("Couldn’t load the notes."); }
   }
 }
 
@@ -381,8 +381,9 @@ async function submitForm() {
     }
     await load();
   } catch (e) {
-    showError(e.message);
+    // Re-read first, so this line is not replaced by the re-read's own.
     await load();
+    showError(failText(e, "Couldn’t save the note — try again."));
   }
 }
 
@@ -402,17 +403,24 @@ window.removeNote = async (id) => {
 
   try {
     const { changed } = await db("DELETE FROM app_notes__notes WHERE id = ?", [id]);
-    if (changed === 0) throw new Error("This note could not be deleted.");
+    if (changed === 0) throw Object.assign(new Error("This note could not be deleted."), { forUser: true });
   } catch (e) {
-    showError(e.message);
+    // Re-read first, so this line is not replaced by the re-read's own.
     await load();
+    showError(failText(e, "Couldn’t delete the note — try again."));
   }
 };
 
 // ── Error display ─────────────────────────────────────────────────────────────
+// A failed write shows this app's own wording when the error carries it
+// (`forUser`), otherwise one fixed line; the hub's error text goes to the console.
+function failText(e, line) {
+  if (!e?.forUser) console.error("[notes] write failed:", e);
+  return e?.forUser ? e.message : line;
+}
 function showError(msg) {
   const area = document.getElementById("error-area");
-  area.innerHTML = `<div class="error-banner">Error: ${esc(msg)}</div>`;
+  area.innerHTML = `<div class="error-banner">${esc(msg)}</div>`;
   setTimeout(() => { area.innerHTML = ""; }, 5000);
 }
 
