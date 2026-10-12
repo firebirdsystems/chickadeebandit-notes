@@ -105,6 +105,9 @@
       background: var(--red-light); color: var(--red); border-radius: 8px;
       padding: 10px 14px; font-size: 0.85rem; margin-bottom: 16px;
     }
+    .load-error { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: var(--hub-tint-danger, #fee2e2); color: var(--hub-tint-danger-fg, #b91c1c); font-size: 0.9rem; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+    .load-error[hidden] { display: none; }
+    .load-error-retry { background: none; border: 1px solid currentColor; border-radius: 8px; padding: 5px 10px; font: inherit; font-weight: 600; color: inherit; cursor: pointer; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -117,9 +120,10 @@
   <button class="btn btn-primary" id="new-btn" data-testid="new-note" style="display:none">+ New Note</button>
 </div>
 
+<div id="load-error" class="load-error" data-testid="load-error" role="alert" hidden><span>Couldn’t load notes.</span> <button type="button" class="load-error-retry" data-testid="load-retry">Try again</button></div>
 <div id="error-area" data-testid="error-area"></div>
 <div id="form-area" data-testid="form-area"></div>
-<div class="search-row">
+<div class="search-row" id="search-row">
   <input id="search-input" data-testid="search-input" class="search-input" type="search" placeholder="Search notes…" aria-label="Search notes" />
 </div>
 <div class="notes-grid" id="notes-grid" data-testid="notes-grid">
@@ -204,25 +208,36 @@ async function db(sql, params = []) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sql, params }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? `DB error ${res.status}`);
-  }
-  return res.json();
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json || typeof json !== "object" || json.error) throw new Error(json?.error || "Couldn’t reach the hub. Try again.");
+  return json;
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────────
 async function loadMembers() {
   if (!CONTEXT) return;
-  try {
-    const res = await fetch(`${CONTEXT}?keys=family.members`);
-    members = ((await res.json())["family.members"]) ?? [];
-    membersMap = new Map(members.map(m => [m.id, m]));
-  } catch { members = []; }
+  // A roster that could not be read is a failed load, not an empty household.
+  const res = await fetch(`${CONTEXT}?keys=family.members`);
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json || typeof json !== "object" || json.error) throw new Error("Couldn’t reach the hub. Try again.");
+  // A 200 can still name a key the hub failed to read: that is a failed load too.
+  if (Array.isArray(json.$errors) && json.$errors.includes("family.members")) throw new Error("Couldn’t reach the hub. Try again.");
+  members = json["family.members"] ?? [];
+  membersMap = new Map(members.map(m => [m.id, m]));
 }
 
 function memberName(id) { return memberNameOf(membersMap, id); }
 
+let loaded = false;   // whether any read of the notes has succeeded yet
+// Set when the first load fails, cleared when a load succeeds. While set the
+// banner shows in place of the grid, the search box and the "new note" control.
+let loadFailed = false;
+function setLoadFailed(failed) {
+  loadFailed = failed;
+  document.getElementById("load-error").hidden = !failed;
+  document.getElementById("search-row").style.display = failed ? "none" : "";
+  newBtn.style.display = CAN_WRITE && !failed ? "" : "none";
+}
 async function load() {
   try {
     const result = await db(
@@ -230,9 +245,16 @@ async function load() {
     );
     notes = mapNoteRows(result.rows);
     notesMap = new Map(notes.map(n => [n.id, n]));
+    loaded = true;
+    setLoadFailed(false);
     render();
   } catch (e) {
-    showError(e.message);
+    // A first read that failed shows the failed-load banner and an empty grid
+    // rather than "Loading…"; a later one keeps what is on screen.
+    if (!loaded) {
+      document.getElementById("notes-grid").innerHTML = "";
+      setLoadFailed(true);
+    } else showError(e.message);
   }
 }
 
@@ -350,10 +372,12 @@ async function submitForm() {
         member_id: HUB_MEMBER?.id ?? "unknown",
       });
     } else {
-      await db(
+      const { changed } = await db(
         "UPDATE app_notes__notes SET title = ?, content = ?, updated_at = ? WHERE id = ?",
         [title, content, now, noteId]
       );
+      // The re-read below puts back what is stored.
+      if (changed === 0) showError("This note could not be changed.");
     }
     await load();
   } catch (e) {
@@ -377,7 +401,8 @@ window.removeNote = async (id) => {
   render();
 
   try {
-    await db("DELETE FROM app_notes__notes WHERE id = ?", [id]);
+    const { changed } = await db("DELETE FROM app_notes__notes WHERE id = ?", [id]);
+    if (changed === 0) throw new Error("This note could not be deleted.");
   } catch (e) {
     showError(e.message);
     await load();
@@ -418,7 +443,13 @@ document.getElementById("notes-grid").addEventListener("click", (e) => {
   }
 });
 
-(async () => { await loadMembers(); await load(); })();
+async function firstLoad() {
+  try { await loadMembers(); }
+  catch { document.getElementById("notes-grid").innerHTML = ""; setLoadFailed(true); return; }
+  await load();
+}
+document.querySelector('[data-testid="load-retry"]').addEventListener("click", firstLoad);
+firstLoad();
 </script>
 </body>
 </html>
